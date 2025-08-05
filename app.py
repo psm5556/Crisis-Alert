@@ -62,7 +62,7 @@ st.markdown("""
 
 # FRED API 키 설정 (사용자가 입력하도록)
 st.sidebar.title("⚙️ 설정")
-fred_api_key = st.sidebar.text_input("FRED API Key", type="password", 
+fred_api_key = st.sidebar.text_input("FRED API Key", type="cf41351b81f43ad46071e4aa487f40c8", 
                                     help="https://fred.stlouisfed.org/docs/api/api_key.html 에서 무료로 발급받으세요")
 
 # 메인 헤더
