@@ -344,13 +344,15 @@ def analyze_yield_curve_signal(yield_data):
 
 # 데이터 로드
 with st.spinner("데이터를 로드하는 중..."):
-    col1, col2, col3 = st.columns(3)
     
-    with col1:
-        st.subheader("📊 SOFR 단기자금시장 금리")
-        sofr_analysis, sofr_data = analyze_sofr_signal(get_sofr_data())
+    # SOFR 지표
+    st.subheader("📊 SOFR 단기자금시장 금리")
+    sofr_analysis, sofr_data = analyze_sofr_signal(get_sofr_data())
+    
+    if sofr_analysis:
+        col1, col2 = st.columns([1, 2])  # 1:3 비율로 분석결과와 차트 배치
         
-        if sofr_analysis:
+        with col1:
             # 시그널에 따른 색상 설정
             if sofr_analysis['signal'] == "심각한 위기":
                 alert_class = "alert-danger"
@@ -368,7 +370,8 @@ with st.spinner("데이터를 로드하는 중..."):
             st.metric("현재 SOFR 금리", f"{sofr_analysis['current_rate']:.2f}%", 
                      f"{sofr_analysis['daily_change']:+.2f}%")
             st.metric("30일 평균 대비", f"{sofr_analysis['deviation_from_avg']:+.2f}%p")
-            
+        
+        with col2:
             # SOFR 차트
             if sofr_data is not None:
                 fig_sofr = go.Figure()
@@ -387,11 +390,16 @@ with st.spinner("데이터를 로드하는 중..."):
                 )
                 st.plotly_chart(fig_sofr, use_container_width=True)
     
-    with col2:
-        st.subheader("🏭 제조업 PMI")
-        pmi_analysis, pmi_data = analyze_pmi_signal(get_pmi_data_alternative())
+    st.markdown("---")
+    
+    # PMI 지표
+    st.subheader("🏭 제조업 PMI")
+    pmi_analysis, pmi_data = analyze_pmi_signal(get_pmi_data_alternative())
+    
+    if pmi_analysis:
+        col1, col2 = st.columns([1, 2])  # 1:3 비율로 분석결과와 차트 배치
         
-        if pmi_analysis:
+        with col1:
             if pmi_analysis['signal'] == "경제위기 현실화":
                 alert_class = "alert-danger"
             elif pmi_analysis['signal'] in ["경고", "주의"]:
@@ -404,7 +412,8 @@ with st.spinner("데이터를 로드하는 중..."):
             
             st.metric("현재 PMI", f"{pmi_analysis['current_pmi']:.1f}")
             st.metric("최근 3개월 평균", f"{pmi_analysis['recent_3_months_avg']:.1f}")
-            
+        
+        with col2:
             # PMI 차트
             if pmi_data is not None:
                 fig_pmi = go.Figure()
@@ -427,11 +436,16 @@ with st.spinner("데이터를 로드하는 중..."):
                 )
                 st.plotly_chart(fig_pmi, use_container_width=True)
     
-    with col3:
-        st.subheader("📈 일드커브 (10Y-2Y)")
-        yield_analysis, yield_data = analyze_yield_curve_signal(get_yield_curve_data())
+    st.markdown("---")
+    
+    # 일드커브 지표
+    st.subheader("📈 일드커브 (10Y-2Y)")
+    yield_analysis, yield_data = analyze_yield_curve_signal(get_yield_curve_data())
+    
+    if yield_analysis:
+        col1, col2 = st.columns([1, 2])  # 1:3 비율로 분석결과와 차트 배치
         
-        if yield_analysis:
+        with col1:
             if "임박" in yield_analysis['signal']:
                 alert_class = "alert-danger"
             elif "역전" in yield_analysis['signal']:
@@ -446,6 +460,25 @@ with st.spinner("데이터를 로드하는 중..."):
                      f"{yield_analysis['change_30_days']:+.2f}%p (30일)")
             st.metric("60일 변화", f"{yield_analysis['change_60_days']:+.2f}%p")
             
+            # 상세 분석 정보
+            with st.expander("📊 일드커브 상세 분석"):
+                st.write("**역전 구간 정보:**")
+                if yield_analysis['inversion_periods']:
+                    for i, period in enumerate(yield_analysis['inversion_periods'][-3:], 1):  # 최근 3개만 표시
+                        st.write(f"**{i}.** {period['inversion_start'].strftime('%Y-%m-%d')} ~ "
+                               f"{period['inversion_end'].strftime('%Y-%m-%d')} ({period['duration_days']}일)")
+                else:
+                    st.write("최근 역전 구간 없음")
+                
+                st.write("**급격한 정상화:**")
+                if yield_analysis['rapid_normalization_periods']:
+                    for period in yield_analysis['rapid_normalization_periods'][-2:]:  # 최근 2개만 표시
+                        st.write(f"**📈** {period['start'].strftime('%Y-%m-%d')} ~ "
+                               f"{period['end'].strftime('%Y-%m-%d')} (+{period['change']:.1f}%p)")
+                else:
+                    st.write("급격한 정상화 없음")
+        
+        with col2:
             # 고급 일드커브 차트 - 10년 데이터
             if yield_data is not None:
                 fig_yield = go.Figure()
@@ -482,7 +515,7 @@ with st.spinner("데이터를 로드하는 중..."):
                         if period['recession_period_start'] <= yield_data.index[-1]:
                             fig_yield.add_vrect(
                                 x0=period['recession_period_start'],
-                                x1=min(period['recession_period_end'], yield_data.index[-1]),
+                                x1=min(period['recession_period_start'], yield_data.index[-1]),
                                 fillcolor="rgba(255, 0, 0, 0.3)",
                                 layer="below",
                                 line_width=0,
@@ -533,28 +566,6 @@ with st.spinner("데이터를 로드하는 중..."):
                 fig_yield.update_yaxes(range=[y_min, y_max])
                 
                 st.plotly_chart(fig_yield, use_container_width=True)
-            
-            # 상세 분석 정보
-            with st.expander("📊 일드커브 상세 분석"):
-                col_a, col_b = st.columns(2)
-                
-                with col_a:
-                    st.write("**역전 구간 정보:**")
-                    if yield_analysis['inversion_periods']:
-                        for i, period in enumerate(yield_analysis['inversion_periods'][-3:], 1):  # 최근 3개만 표시
-                            st.write(f"**{i}.** {period['inversion_start'].strftime('%Y-%m-%d')} ~ "
-                                   f"{period['inversion_end'].strftime('%Y-%m-%d')} ({period['duration_days']}일)")
-                    else:
-                        st.write("최근 역전 구간 없음")
-                
-                with col_b:
-                    st.write("**급격한 정상화:**")
-                    if yield_analysis['rapid_normalization_periods']:
-                        for period in yield_analysis['rapid_normalization_periods'][-2:]:  # 최근 2개만 표시
-                            st.write(f"**📈** {period['start'].strftime('%Y-%m-%d')} ~ "
-                                   f"{period['end'].strftime('%Y-%m-%d')} (+{period['change']:.1f}%p)")
-                    else:
-                        st.write("급격한 정상화 없음")
 
 # 종합 위기 시그널
 st.markdown("---")
