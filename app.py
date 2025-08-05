@@ -304,6 +304,7 @@ def analyze_yield_curve_signal(yield_data):
     current_spread = yield_data.iloc[-1]
     recent_30_days = yield_data.tail(30)
     change_30_days = current_spread - yield_data.iloc[-30]
+    change_60_days = current_spread - yield_data.iloc[-60] if len(yield_data) >= 60 else 0
     
     signal = "정상"
     is_inverted = current_spread < 0
@@ -316,12 +317,29 @@ def analyze_yield_curve_signal(yield_data):
         signal = "경기침체 임박 (급격한 정상화)"
         rapid_normalization = True
     
+    # 역전 구간 분석 (간단한 버전)
+    inversion_periods = []
+    rapid_normalization_periods = []
+    
+    # 간단한 역전 구간 감지
+    if is_inverted:
+        inversion_periods.append({
+            'inversion_start': yield_data.index[-30],
+            'inversion_end': yield_data.index[-1],
+            'duration_days': 30,
+            'recession_period_start': yield_data.index[-1] + pd.Timedelta(days=180),
+            'recession_period_end': yield_data.index[-1] + pd.Timedelta(days=540)
+        })
+    
     return {
         'current_spread': current_spread,
         'change_30_days': change_30_days,
+        'change_60_days': change_60_days,
         'is_inverted': is_inverted,
         'rapid_normalization': rapid_normalization,
-        'signal': signal
+        'signal': signal,
+        'inversion_periods': inversion_periods,
+        'rapid_normalization_periods': rapid_normalization_periods
     }, yield_data
 
 # 데이터 로드
@@ -414,38 +432,129 @@ with st.spinner("데이터를 로드하는 중..."):
         yield_analysis, yield_data = analyze_yield_curve_signal(get_yield_curve_data())
         
         if yield_analysis:
-            if yield_analysis['signal'] == "경기침체 임박 (급격한 정상화)":
+            if "임박" in yield_analysis['signal']:
                 alert_class = "alert-danger"
             elif "역전" in yield_analysis['signal']:
                 alert_class = "alert-warning"
             else:
                 alert_class = "alert-success"
             
-            st.markdown(f'<div class="{alert_class}"><strong>현재 상태: {yield_analysis["signal"]}</strong></div>', 
+            st.markdown(f'<div class="{alert_class}"><strong>{yield_analysis["signal"]}</strong></div>', 
                        unsafe_allow_html=True)
             
             st.metric("현재 스프레드", f"{yield_analysis['current_spread']:.2f}%p", 
                      f"{yield_analysis['change_30_days']:+.2f}%p (30일)")
+            st.metric("60일 변화", f"{yield_analysis['change_60_days']:+.2f}%p")
             
-            # 일드커브 차트
+            # 고급 일드커브 차트 - 10년 데이터
             if yield_data is not None:
                 fig_yield = go.Figure()
+                
+                # 메인 일드커브 라인
                 fig_yield.add_trace(go.Scatter(
                     x=yield_data.index, 
                     y=yield_data.values,
                     mode='lines',
                     name='10Y-2Y 스프레드',
-                    line=dict(color='purple', width=2)
+                    line=dict(color='purple', width=1.5),
+                    hovertemplate='날짜: %{x}<br>스프레드: %{y:.2f}%p<extra></extra>'
                 ))
+                
+                # 0선 (역전 기준선)
                 fig_yield.add_hline(y=0, line_dash="dash", line_color="red", 
-                                  annotation_text="역전선 (0)")
+                                  annotation_text="역전선 (0%p)")
+                
+                # 역전 구간과 경기침체 예상 구간 하이라이트
+                if yield_analysis['inversion_periods']:
+                    for i, period in enumerate(yield_analysis['inversion_periods']):
+                        # 역전 구간 (연한 빨간색)
+                        fig_yield.add_vrect(
+                            x0=period['inversion_start'],
+                            x1=period['inversion_end'],
+                            fillcolor="rgba(255, 0, 0, 0.1)",
+                            layer="below",
+                            line_width=0,
+                            annotation_text=f"역전 {period['duration_days']}일" if i == 0 else "",
+                            annotation_position="top left"
+                        )
+                        
+                        # 6-18개월 후 경기침체 예상 구간 (진한 빨간색)
+                        if period['recession_period_start'] <= yield_data.index[-1]:
+                            fig_yield.add_vrect(
+                                x0=period['recession_period_start'],
+                                x1=min(period['recession_period_end'], yield_data.index[-1]),
+                                fillcolor="rgba(255, 0, 0, 0.3)",
+                                layer="below",
+                                line_width=0,
+                                annotation_text="침체 예상구간" if i == 0 else "",
+                                annotation_position="bottom left"
+                            )
+                
+                # 급격한 정상화 구간 하이라이트 (오렌지)
+                if yield_analysis['rapid_normalization_periods']:
+                    for period in yield_analysis['rapid_normalization_periods']:
+                        fig_yield.add_vrect(
+                            x0=period['start'],
+                            x1=period['end'],
+                            fillcolor="rgba(255, 165, 0, 0.4)",
+                            layer="below",
+                            line_width=0,
+                            annotation_text=f"급격한 정상화 (+{period['change']:.1f}%p)",
+                            annotation_position="top right"
+                        )
+                
+                # 현재 상태 포인트 강조
+                current_date = yield_data.index[-1]
+                current_value = yield_data.iloc[-1]
+                
+                color = "red" if current_value < 0 else "green"
+                fig_yield.add_trace(go.Scatter(
+                    x=[current_date],
+                    y=[current_value],
+                    mode='markers',
+                    name='현재 상태',
+                    marker=dict(color=color, size=10, symbol='diamond'),
+                    hovertemplate=f'현재: {current_value:.2f}%p<extra></extra>'
+                ))
+                
                 fig_yield.update_layout(
-                    title="일드커브 스프레드 추이",
+                    title="일드커브 스프레드 추이 (10년 데이터)",
                     xaxis_title="날짜",
                     yaxis_title="스프레드 (%p)",
-                    height=300
+                    height=400,
+                    showlegend=True,
+                    legend=dict(x=0.02, y=0.98),
+                    hovermode='x unified'
                 )
+                
+                # Y축 범위 조정
+                y_min = min(yield_data.min() - 0.5, -1)
+                y_max = max(yield_data.max() + 0.5, 3)
+                fig_yield.update_yaxes(range=[y_min, y_max])
+                
                 st.plotly_chart(fig_yield, use_container_width=True)
+            
+            # 상세 분석 정보
+            with st.expander("📊 일드커브 상세 분석"):
+                col_a, col_b = st.columns(2)
+                
+                with col_a:
+                    st.write("**역전 구간 정보:**")
+                    if yield_analysis['inversion_periods']:
+                        for i, period in enumerate(yield_analysis['inversion_periods'][-3:], 1):  # 최근 3개만 표시
+                            st.write(f"**{i}.** {period['inversion_start'].strftime('%Y-%m-%d')} ~ "
+                                   f"{period['inversion_end'].strftime('%Y-%m-%d')} ({period['duration_days']}일)")
+                    else:
+                        st.write("최근 역전 구간 없음")
+                
+                with col_b:
+                    st.write("**급격한 정상화:**")
+                    if yield_analysis['rapid_normalization_periods']:
+                        for period in yield_analysis['rapid_normalization_periods'][-2:]:  # 최근 2개만 표시
+                            st.write(f"**📈** {period['start'].strftime('%Y-%m-%d')} ~ "
+                                   f"{period['end'].strftime('%Y-%m-%d')} (+{period['change']:.1f}%p)")
+                    else:
+                        st.write("급격한 정상화 없음")
 
 # 종합 위기 시그널
 st.markdown("---")
