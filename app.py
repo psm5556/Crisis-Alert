@@ -417,12 +417,12 @@ with st.spinner("데이터를 로드하는 중..."):
             # PMI 차트
             if pmi_data is not None:
                 fig_pmi = go.Figure()
-                fig_pmi.add_trace(go.Scatter(
+                fig_pmi.add_trace(go.Bar(
                     x=pmi_data.index, 
                     y=pmi_data.values,
-                    mode='lines',
                     name='PMI',
-                    line=dict(color='green', width=2)
+                    marker_color='green',
+                    opacity=0.7
                 ))
                 fig_pmi.add_hline(y=50, line_dash="dash", line_color="black", 
                                 annotation_text="기준선 (50)")
@@ -432,7 +432,8 @@ with st.spinner("데이터를 로드하는 중..."):
                     title="제조업 PMI 추이",
                     xaxis_title="날짜",
                     yaxis_title="PMI",
-                    height=300
+                    height=300,
+                    showlegend=True
                 )
                 st.plotly_chart(fig_pmi, use_container_width=True)
     
