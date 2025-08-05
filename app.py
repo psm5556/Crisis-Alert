@@ -62,7 +62,7 @@ st.markdown("""
 
 # FRED API 키 설정 (사용자가 입력하도록)
 st.sidebar.title("⚙️ 설정")
-fred_api_key = st.sidebar.text_input("FRED API Key", type="cf41351b81f43ad46071e4aa487f40c8", 
+fred_api_key = st.sidebar.text_input("FRED API Key", value="cf41351b81f43ad46071e4aa487f40c8", 
                                     help="https://fred.stlouisfed.org/docs/api/api_key.html 에서 무료로 발급받으세요")
 
 # 메인 헤더
@@ -219,21 +219,24 @@ with st.spinner("데이터를 로드하는 중..."):
             st.metric("30일 평균 대비", f"{sofr_analysis['deviation_from_avg']:+.2f}%p")
             
             # SOFR 차트
-            fig_sofr = go.Figure()
-            fig_sofr.add_trace(go.Scatter(
-                x=sofr_data.index, 
-                y=sofr_data.values,
-                mode='lines',
-                name='SOFR',
-                line=dict(color='blue', width=2)
-            ))
-            fig_sofr.update_layout(
-                title="SOFR 금리 추이",
-                xaxis_title="날짜",
-                yaxis_title="금리 (%)",
-                height=300
-            )
-            st.plotly_chart(fig_sofr, use_container_width=True)
+            if sofr_data is not None:
+                fig_sofr = go.Figure()
+                fig_sofr.add_trace(go.Scatter(
+                    x=sofr_data.index, 
+                    y=sofr_data.values,
+                    mode='lines',
+                    name='SOFR',
+                    line=dict(color='blue', width=2)
+                ))
+                fig_sofr.update_layout(
+                    title="SOFR 금리 추이",
+                    xaxis_title="날짜",
+                    yaxis_title="금리 (%)",
+                    height=300
+                )
+                st.plotly_chart(fig_sofr, use_container_width=True)
+            else:
+                st.warning("SOFR 차트 데이터를 불러올 수 없습니다.")
     
     with col2:
         st.subheader("🏭 제조업 PMI")
@@ -254,25 +257,28 @@ with st.spinner("데이터를 로드하는 중..."):
             st.metric("최근 3개월 평균", f"{pmi_analysis['recent_3_months_avg']:.1f}")
             
             # PMI 차트
-            fig_pmi = go.Figure()
-            fig_pmi.add_trace(go.Scatter(
-                x=pmi_data.index, 
-                y=pmi_data.values,
-                mode='lines',
-                name='PMI',
-                line=dict(color='green', width=2)
-            ))
-            fig_pmi.add_hline(y=50, line_dash="dash", line_color="black", 
-                            annotation_text="기준선 (50)")
-            fig_pmi.add_hline(y=45, line_dash="dash", line_color="red", 
-                            annotation_text="위기선 (45)")
-            fig_pmi.update_layout(
-                title="제조업 PMI 추이",
-                xaxis_title="날짜",
-                yaxis_title="PMI",
-                height=300
-            )
-            st.plotly_chart(fig_pmi, use_container_width=True)
+            if pmi_data is not None:
+                fig_pmi = go.Figure()
+                fig_pmi.add_trace(go.Scatter(
+                    x=pmi_data.index, 
+                    y=pmi_data.values,
+                    mode='lines',
+                    name='PMI',
+                    line=dict(color='green', width=2)
+                ))
+                fig_pmi.add_hline(y=50, line_dash="dash", line_color="black", 
+                                annotation_text="기준선 (50)")
+                fig_pmi.add_hline(y=45, line_dash="dash", line_color="red", 
+                                annotation_text="위기선 (45)")
+                fig_pmi.update_layout(
+                    title="제조업 PMI 추이",
+                    xaxis_title="날짜",
+                    yaxis_title="PMI",
+                    height=300
+                )
+                st.plotly_chart(fig_pmi, use_container_width=True)
+            else:
+                st.warning("PMI 차트 데이터를 불러올 수 없습니다.")
     
     with col3:
         st.subheader("📈 일드커브 (10Y-2Y)")
@@ -293,23 +299,26 @@ with st.spinner("데이터를 로드하는 중..."):
                      f"{yield_analysis['change_30_days']:+.2f}%p (30일)")
             
             # 일드커브 차트
-            fig_yield = go.Figure()
-            fig_yield.add_trace(go.Scatter(
-                x=yield_data.index, 
-                y=yield_data.values,
-                mode='lines',
-                name='10Y-2Y 스프레드',
-                line=dict(color='purple', width=2)
-            ))
-            fig_yield.add_hline(y=0, line_dash="dash", line_color="red", 
-                              annotation_text="역전선 (0)")
-            fig_yield.update_layout(
-                title="일드커브 스프레드 추이",
-                xaxis_title="날짜",
-                yaxis_title="스프레드 (%p)",
-                height=300
-            )
-            st.plotly_chart(fig_yield, use_container_width=True)
+            if yield_data is not None:
+                fig_yield = go.Figure()
+                fig_yield.add_trace(go.Scatter(
+                    x=yield_data.index, 
+                    y=yield_data.values,
+                    mode='lines',
+                    name='10Y-2Y 스프레드',
+                    line=dict(color='purple', width=2)
+                ))
+                fig_yield.add_hline(y=0, line_dash="dash", line_color="red", 
+                                  annotation_text="역전선 (0)")
+                fig_yield.update_layout(
+                    title="일드커브 스프레드 추이",
+                    xaxis_title="날짜",
+                    yaxis_title="스프레드 (%p)",
+                    height=300
+                )
+                st.plotly_chart(fig_yield, use_container_width=True)
+            else:
+                st.warning("일드커브 차트 데이터를 불러올 수 없습니다.")
 
 # 종합 위기 시그널
 st.markdown("---")
